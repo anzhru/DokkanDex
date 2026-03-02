@@ -1,5 +1,13 @@
 import React, { useEffect } from 'react';
-import { ScrollView, View, Text, Image, StyleSheet } from 'react-native';
+import {
+  ScrollView,
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Transformation } from '../types';
 import { useCharacter } from '../hooks/useCharacter';
@@ -8,135 +16,268 @@ import { ErrorView } from '../components/ErrorView';
 import { getCharacterImageUrl } from '../utils/imageUtils';
 import { COLORS, FONT_SIZES, SPACING } from '../constants';
 
+// ─── Local theme maps ─────────────────────────────────────────────────────────
+
+const TYPE_COLOR: Record<string, string> = {
+  STR: '#e53e3e',
+  AGL: '#3182ce',
+  TEQ: '#38a169',
+  INT: '#805ad5',
+  PHY: '#d69e2e',
+};
+
+const TYPE_ICON: Record<string, string> = {
+  STR: '🔴',
+  AGL: '🔵',
+  TEQ: '🟢',
+  INT: '🟣',
+  PHY: '🟡',
+};
+
+const RARITY_COLOR: Record<string, string> = {
+  LR:  '#FFD700',
+  UR:  '#FF6B35',
+  SSR: '#FFA500',
+  SR:  '#4CAF50',
+  R:   '#2196F3',
+  N:   '#9E9E9E',
+};
+
+// Gradient: transparent image top → background colour at the bottom
+const HERO_GRADIENT: readonly [string, string, string] = [
+  'transparent',
+  'rgba(26, 26, 46, 0.65)',
+  COLORS.background,
+] as const;
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 type Props = NativeStackScreenProps<RootStackParamList, 'CharacterDetail'>;
 
 export function CharacterDetailScreen({ route, navigation }: Props) {
   const { characterId } = route.params;
   const { character, loading, error, refetch } = useCharacter(characterId);
+  const { width } = useWindowDimensions();
 
-  // Set header title once character is loaded
+  const heroHeight = Math.round(width * 0.9);
+
   useEffect(() => {
     if (character?.name) {
       navigation.setOptions({ title: character.name });
     }
   }, [character?.name, navigation]);
 
-  if (loading) return <LoadingSpinner message="Loading character..." />;
-  if (error || !character) return <ErrorView message={error ?? 'Character not found'} onRetry={refetch} />;
+  if (loading) return <LoadingSpinner message="Loading character…" />;
+  if (error || !character) {
+    return <ErrorView message={error ?? 'Character not found'} onRetry={refetch} />;
+  }
 
-  const typeColor = character.type ? COLORS.type[character.type] : COLORS.card;
-  const rarityColor = character.rarity ? COLORS.rarity[character.rarity] : COLORS.gold;
+  const typeColor   = character.type   ? TYPE_COLOR[character.type]     : COLORS.card;
+  const rarityColor = character.rarity ? RARITY_COLOR[character.rarity] : COLORS.gold;
+  const typeIcon    = character.type   ? TYPE_ICON[character.type]      : '';
+  const imageUri    = getCharacterImageUrl(character.id, character.imageURL);
+
+  // Rainbow stats exist → show full 4-tier table; otherwise show 2-tier
+  const hasRainbow = !!(character.rainbowHP || character.rainbowAttack || character.rainbowDefence);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Hero image */}
-      <Image
-        source={{ uri: getCharacterImageUrl(character.id, character.imageURL) }}
-        style={styles.art}
-        resizeMode="contain"
-      />
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ━━━ HERO IMAGE with gradient overlay ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <View style={{ width, height: heroHeight }}>
+        {/* Type-tinted background behind image */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: typeColor, opacity: 0.12 }]} />
 
-      {/* Type / Rarity / Class badges */}
-      <View style={styles.header}>
+        <Image
+          source={{ uri: imageUri }}
+          style={[StyleSheet.absoluteFill, { width, height: heroHeight }]}
+          resizeMode="contain"
+        />
+
+        {/* Bottom gradient fade so the name text is always legible */}
+        <LinearGradient
+          colors={HERO_GRADIENT}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0.3 }}
+          end={{ x: 0, y: 1 }}
+          pointerEvents="none"
+        />
+
+        {/* Name / Title floating over gradient */}
+        <View style={styles.heroText}>
+          {character.title ? (
+            <Text style={styles.heroTitle} numberOfLines={2}>{character.title}</Text>
+          ) : null}
+          <Text style={styles.heroName} numberOfLines={2}>
+            {character.name ?? 'Unknown'}
+          </Text>
+        </View>
+      </View>
+
+      {/* ━━━ TYPE ACCENT BAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <View style={[styles.typeBar, { backgroundColor: typeColor }]} />
+
+      {/* ━━━ BADGES ROW ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <View style={styles.badgesRow}>
         {character.type && (
-          <View style={[styles.badge, { backgroundColor: typeColor }]}>
-            <Text style={styles.badgeText}>{character.type}</Text>
+          <View style={[styles.typeBadge, { backgroundColor: typeColor }]}>
+            <Text style={styles.badgeEmoji}>{typeIcon}</Text>
+            <Text style={styles.badgeLabel}>{character.type}</Text>
           </View>
         )}
         {character.rarity && (
-          <View style={[styles.badge, { backgroundColor: rarityColor }]}>
-            <Text style={styles.badgeText}>{character.rarity}</Text>
+          <View style={[styles.rarityBadge, { backgroundColor: rarityColor }]}>
+            {character.rarity === 'LR' && <Text style={styles.badgeEmoji}>★ </Text>}
+            <Text style={styles.badgeLabel}>{character.rarity}</Text>
           </View>
         )}
         {character.class && (
-          <View style={[styles.badge, styles.classBadge]}>
-            <Text style={styles.badgeText}>{character.class}</Text>
+          <View style={styles.classBadge}>
+            <Text style={styles.classBadgeLabel}>{character.class}</Text>
           </View>
         )}
       </View>
 
-      <Text style={styles.title}>{character.title ?? ''}</Text>
-      <Text style={styles.name}>{character.name ?? 'Unknown'}</Text>
+      {/* ━━━ INFO PILLS (Cost / Max Level / Max SA) ━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {(character.cost || character.maxLevel || character.maxSALevel) && (
+        <View style={styles.infoRow}>
+          <InfoPill icon="💰" label="Cost"   value={character.cost} />
+          <Divider />
+          <InfoPill icon="⬆️" label="Max Lv" value={character.maxLevel} />
+          <Divider />
+          <InfoPill icon="⚡" label="Max SA" value={character.maxSALevel} />
+        </View>
+      )}
 
-      {/* Base stats grid */}
-      <View style={styles.statsGrid}>
-        <StatColumn
-          label="Base"
-          hp={character.baseHP}
-          atk={character.baseAttack}
-          def={character.baseDefence}
-        />
-        <StatColumn
-          label="Max Lv"
-          hp={character.maxLevelHP}
-          atk={character.maxLevelAttack}
-          def={character.maxDefence}
-        />
-        <StatColumn
-          label="Free Dupe"
-          hp={character.freeDupeHP}
-          atk={character.freeDupeAttack}
-          def={character.freeDupeDefence}
-        />
-        <StatColumn
-          label="Rainbow"
-          hp={character.rainbowHP}
-          atk={character.rainbowAttack}
-          def={character.rainbowDefence}
-        />
-      </View>
+      {/* ━━━ SKILLS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
 
-      {/* Cost / Level row */}
-      <View style={styles.infoRow}>
-        <InfoPill label="Cost" value={character.cost} />
-        <InfoPill label="Max Lv" value={character.maxLevel} />
-        <InfoPill label="Max SA" value={character.maxSALevel} />
-      </View>
-
-      {/* Skills */}
       {character.leaderSkill && (
-        <SkillSection label="Leader Skill" content={character.leaderSkill} ezaContent={character.ezaLeaderSkill} />
+        <SkillCard
+          icon="👑"
+          label="Leader Skill"
+          content={character.leaderSkill}
+          ezaContent={character.ezaLeaderSkill}
+          accentColor={COLORS.gold}
+        />
       )}
+
       {character.superAttack && (
-        <SkillSection label="Super Attack" content={character.superAttack} ezaContent={character.ezaSuperAttack} />
+        <SkillCard
+          icon="⚡"
+          label="Super Attack"
+          content={character.superAttack}
+          ezaContent={character.ezaSuperAttack}
+          accentColor={typeColor}
+        />
       )}
+
       {character.ultraSuperAttack && (
-        <SkillSection label="Ultra Super Attack" content={character.ultraSuperAttack} ezaContent={character.ezaUltraSuperAttack} />
+        <SkillCard
+          icon="🌟"
+          label="Ultra Super Attack"
+          content={character.ultraSuperAttack}
+          ezaContent={character.ezaUltraSuperAttack}
+          accentColor={typeColor}
+        />
       )}
+
       {character.passive && (
-        <SkillSection label="Passive Skill" content={character.passive} ezaContent={character.ezaPassive} />
+        <SkillCard
+          icon="✨"
+          label="Passive Skill"
+          content={character.passive}
+          ezaContent={character.ezaPassive}
+          accentColor="#a855f7"
+        />
       )}
+
       {character.activeSkill && (
-        <SkillSection
+        <SkillCard
+          icon="🎯"
           label="Active Skill"
           content={character.activeSkill}
-          subContent={character.activeSkillCondition ?? undefined}
+          subNote={character.activeSkillCondition ?? undefined}
+          accentColor={COLORS.accent}
         />
       )}
 
-      {/* Categories */}
+      {/* ━━━ STATS TABLE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {(character.baseHP || character.baseAttack || character.baseDefence) && (
+        <SectionCard icon="📊" label="Stats">
+          {/* Column headers */}
+          <View style={styles.statsHeaderRow}>
+            <View style={styles.statsLabelCol} />
+            <Text style={styles.statsColHeader}>Base</Text>
+            <Text style={styles.statsColHeader}>Max Lv</Text>
+            {hasRainbow && <Text style={[styles.statsColHeader, styles.rainbowHeader]}>Rainbow</Text>}
+          </View>
+          <StatRow
+            icon="❤️"
+            label="HP"
+            base={character.baseHP}
+            max={character.maxLevelHP}
+            rainbow={hasRainbow ? character.rainbowHP : undefined}
+          />
+          <StatRow
+            icon="⚔️"
+            label="ATK"
+            base={character.baseAttack}
+            max={character.maxLevelAttack}
+            rainbow={hasRainbow ? character.rainbowAttack : undefined}
+          />
+          <StatRow
+            icon="🛡️"
+            label="DEF"
+            base={character.baseDefence}
+            max={character.maxDefence}
+            rainbow={hasRainbow ? character.rainbowDefence : undefined}
+          />
+        </SectionCard>
+      )}
+
+      {/* ━━━ CATEGORIES ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {!!character.categories?.length && (
-        <TagSection label="Categories" tags={character.categories} />
+        <SectionCard icon="📂" label="Categories">
+          <View style={styles.tagWrap}>
+            {character.categories.map((cat) => (
+              <View key={cat} style={styles.categoryTag}>
+                <Text style={styles.categoryTagText}>{cat}</Text>
+              </View>
+            ))}
+          </View>
+        </SectionCard>
       )}
 
-      {/* Links */}
+      {/* ━━━ LINK SKILLS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {!!character.links?.length && (
-        <TagSection label="Links" tags={character.links} highlighted />
+        <SectionCard icon="🔗" label="Link Skills">
+          <View style={styles.tagWrap}>
+            {character.links.map((link) => (
+              <View key={link} style={styles.linkTag}>
+                <Text style={styles.linkTagText}>{link}</Text>
+              </View>
+            ))}
+          </View>
+        </SectionCard>
       )}
 
-      {/* Ki Multiplier */}
+      {/* ━━━ KI MULTIPLIER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {character.kiMultiplier && (
-        <Section label="Ki Multiplier" content={character.kiMultiplier} />
+        <SectionCard icon="🔮" label="Ki Multiplier">
+          <Text style={styles.bodyText}>{character.kiMultiplier}</Text>
+        </SectionCard>
       )}
 
-      {/* Transformations */}
+      {/* ━━━ TRANSFORMATIONS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {!!character.transformations?.length && (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Transformations</Text>
+        <SectionCard icon="🔄" label="Transformations">
           {character.transformations.map((t, i) => (
-            <TransformationCard key={t.transformedID ?? i} transformation={t} />
+            <TransformCard key={t.transformedID ?? i} t={t} />
           ))}
-        </View>
+        </SectionCard>
       )}
     </ScrollView>
   );
@@ -144,117 +285,143 @@ export function CharacterDetailScreen({ route, navigation }: Props) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatColumn({
-  label, hp, atk, def,
-}: {
-  label: string;
-  hp: number | null;
-  atk: number | null;
-  def: number | null;
-}) {
-  if (!hp && !atk && !def) return null;
-  return (
-    <View style={styles.statCol}>
-      <Text style={styles.statColLabel}>{label}</Text>
-      <StatRow icon="❤️" value={hp} />
-      <StatRow icon="⚔️" value={atk} />
-      <StatRow icon="🛡️" value={def} />
-    </View>
-  );
+function Divider() {
+  return <View style={styles.pillDivider} />;
 }
 
-function StatRow({ icon, value }: { icon: string; value: number | null }) {
-  return (
-    <View style={styles.statRow}>
-      <Text style={styles.statIcon}>{icon}</Text>
-      <Text style={styles.statValue}>{value?.toLocaleString() ?? '—'}</Text>
-    </View>
-  );
-}
-
-function InfoPill({ label, value }: { label: string; value: number | null }) {
+function InfoPill({ icon, label, value }: { icon: string; label: string; value: number | null }) {
   if (value == null) return null;
   return (
     <View style={styles.infoPill}>
+      <Text style={styles.infoPillIcon}>{icon}</Text>
       <Text style={styles.infoPillValue}>{value}</Text>
       <Text style={styles.infoPillLabel}>{label}</Text>
     </View>
   );
 }
 
-function SkillSection({
-  label, content, ezaContent, subContent,
+// Generic section wrapper with header
+function SectionCard({
+  icon, label, children,
 }: {
+  icon: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardHeaderIcon}>{icon}</Text>
+        <Text style={styles.cardHeaderLabel}>{label}</Text>
+      </View>
+      <View style={styles.cardBody}>{children}</View>
+    </View>
+  );
+}
+
+// Skill section — supports EZA variant and sub-note (active skill condition)
+function SkillCard({
+  icon, label, content, ezaContent, subNote, accentColor,
+}: {
+  icon: string;
   label: string;
   content: string;
   ezaContent?: string | null;
-  subContent?: string;
+  subNote?: string;
+  accentColor: string;
 }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{label}</Text>
-      <Text style={styles.sectionContent}>{content}</Text>
-      {subContent && (
-        <Text style={styles.subContent}>Condition: {subContent}</Text>
-      )}
-      {ezaContent && (
-        <>
-          <Text style={styles.ezaLabel}>EZA</Text>
-          <Text style={styles.sectionContent}>{ezaContent}</Text>
-        </>
-      )}
-    </View>
-  );
-}
-
-function Section({ label, content }: { label: string; content: string }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{label}</Text>
-      <Text style={styles.sectionContent}>{content}</Text>
-    </View>
-  );
-}
-
-function TagSection({ label, tags, highlighted = false }: { label: string; tags: string[]; highlighted?: boolean }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{label}</Text>
-      <View style={styles.tags}>
-        {tags.map((tag) => (
-          <View key={tag} style={[styles.tag, highlighted && styles.tagHighlighted]}>
-            <Text style={styles.tagText}>{tag}</Text>
+    <View style={[styles.card, { borderLeftColor: accentColor, borderLeftWidth: 3 }]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardHeaderIcon}>{icon}</Text>
+        <Text style={[styles.cardHeaderLabel, { color: accentColor }]}>{label}</Text>
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.bodyText}>{content}</Text>
+        {subNote ? (
+          <Text style={styles.subNote}>⏱ Activates when: {subNote}</Text>
+        ) : null}
+        {ezaContent ? (
+          <View style={styles.ezaBlock}>
+            <View style={styles.ezaDivider}>
+              <View style={styles.ezaLine} />
+              <View style={styles.ezaPill}>
+                <Text style={styles.ezaPillText}>EZA</Text>
+              </View>
+              <View style={styles.ezaLine} />
+            </View>
+            <Text style={styles.bodyText}>{ezaContent}</Text>
           </View>
-        ))}
+        ) : null}
       </View>
     </View>
   );
 }
 
-function TransformationCard({ transformation }: { transformation: Transformation }) {
-  const typeColor = transformation.transformedType
-    ? COLORS.type[transformation.transformedType as keyof typeof COLORS.type] ?? COLORS.card
+// Stats comparison row (one stat across Base / Max Lv / Rainbow tiers)
+function StatRow({
+  icon, label, base, max, rainbow,
+}: {
+  icon: string;
+  label: string;
+  base: number | null;
+  max: number | null;
+  rainbow?: number | null;
+}) {
+  const fmt = (n: number | null | undefined) =>
+    n != null ? n.toLocaleString() : '—';
+
+  return (
+    <View style={styles.statsRow}>
+      <View style={styles.statsLabelCol}>
+        <Text style={styles.statsIcon}>{icon}</Text>
+        <Text style={styles.statsLabel}>{label}</Text>
+      </View>
+      <Text style={styles.statsCell}>{fmt(base)}</Text>
+      <Text style={styles.statsCell}>{fmt(max)}</Text>
+      {rainbow !== undefined && (
+        <Text style={[styles.statsCell, styles.rainbowCell]}>{fmt(rainbow)}</Text>
+      )}
+    </View>
+  );
+}
+
+// Single transformation entry
+function TransformCard({ t }: { t: Transformation }) {
+  const tTypeColor = t.transformedType
+    ? (TYPE_COLOR[t.transformedType] ?? COLORS.card)
     : COLORS.card;
 
   return (
     <View style={styles.transformCard}>
-      {transformation.transformedImageURL && (
+      {t.transformedImageURL ? (
         <Image
-          source={{ uri: transformation.transformedImageURL }}
-          style={styles.transformImage}
+          source={{ uri: t.transformedImageURL }}
+          style={styles.transformImg}
           resizeMode="contain"
         />
+      ) : (
+        <View style={[styles.transformImg, styles.transformImgPlaceholder]}>
+          <Text style={{ fontSize: 28 }}>❓</Text>
+        </View>
       )}
-      <View style={styles.transformInfo}>
-        {transformation.transformedType && (
-          <View style={[styles.badge, { backgroundColor: typeColor, alignSelf: 'flex-start', marginBottom: SPACING.xs }]}>
-            <Text style={styles.badgeText}>{transformation.transformedType}</Text>
+      <View style={styles.transformBody}>
+        {t.transformedType ? (
+          <View style={[styles.transformTypeBadge, { backgroundColor: tTypeColor }]}>
+            <Text style={styles.badgeLabel}>{t.transformedType}</Text>
           </View>
-        )}
-        <Text style={styles.transformName}>{transformation.transformedName ?? 'Unknown'}</Text>
-        {transformation.transformedPassive && (
-          <Text style={styles.transformPassive} numberOfLines={3}>{transformation.transformedPassive}</Text>
-        )}
+        ) : null}
+        <Text style={styles.transformName}>{t.transformedName ?? 'Unknown form'}</Text>
+        {t.transformedPassive ? (
+          <Text style={styles.transformPassive} numberOfLines={4}>
+            {t.transformedPassive}
+          </Text>
+        ) : null}
+        {t.transformedSuperAttack ? (
+          <Text style={styles.transformSA} numberOfLines={2}>
+            ⚡ {t.transformedSuperAttack}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -263,125 +430,268 @@ function TransformationCard({ transformation }: { transformation: Transformation
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  content: { paddingBottom: SPACING.xxl },
+  screen:  { flex: 1, backgroundColor: COLORS.background },
+  content: { paddingBottom: 64 },
 
-  art: { width: '100%', height: 280, backgroundColor: COLORS.surface },
+  // ── Hero ──────────────────────────────────────────────────────────────
 
-  header: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
+  heroText: {
+    position: 'absolute',
+    bottom: SPACING.lg,
+    left: SPACING.lg,
+    right: SPACING.lg,
   },
-  badge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: 6,
-  },
-  classBadge: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.text.muted,
-  },
-  badgeText: { color: COLORS.text.primary, fontSize: FONT_SIZES.sm, fontWeight: '700' },
-
-  title: {
+  heroTitle: {
     color: COLORS.text.secondary,
     fontSize: FONT_SIZES.sm,
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.sm,
+    fontWeight: '500',
+    marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
-  name: {
-    color: COLORS.text.primary,
-    fontSize: FONT_SIZES.xxl,
+  heroName: {
+    color: '#ffffff',
+    fontSize: FONT_SIZES.xxxl,
     fontWeight: '800',
-    paddingHorizontal: SPACING.lg,
-    marginTop: 2,
-    marginBottom: SPACING.lg,
+    lineHeight: 36,
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
 
-  // Stat grid
-  statsGrid: {
+  // ── Type accent bar ───────────────────────────────────────────────────
+
+  typeBar: {
+    height: 3,
+    width: '100%',
+    opacity: 0.9,
+  },
+
+  // ── Badges row ────────────────────────────────────────────────────────
+
+  badgesRow: {
     flexDirection: 'row',
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: SPACING.md,
     gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xs,
+    flexWrap: 'wrap',
   },
-  statCol: { flex: 1, alignItems: 'center', gap: 4 },
-  statColLabel: {
-    color: COLORS.gold,
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '700',
-    marginBottom: SPACING.xs,
-    textAlign: 'center',
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: 20,
   },
-  statRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  statIcon: { fontSize: 10 },
-  statValue: { color: COLORS.text.primary, fontSize: FONT_SIZES.xs, fontWeight: '600' },
+  rarityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: 20,
+  },
+  classBadge: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: COLORS.text.muted,
+  },
+  badgeEmoji:      { fontSize: 12 },
+  badgeLabel:      { color: '#fff', fontSize: FONT_SIZES.sm, fontWeight: '700' },
+  classBadgeLabel: { color: COLORS.text.secondary, fontSize: FONT_SIZES.sm, fontWeight: '600' },
 
-  // Info pills
+  // ── Info pills ────────────────────────────────────────────────────────
+
   infoRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-around',
     marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+    marginVertical: SPACING.sm,
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: SPACING.md,
+    borderRadius: 14,
+    paddingVertical: SPACING.md,
   },
-  infoPill: { alignItems: 'center' },
-  infoPillValue: { color: COLORS.text.primary, fontSize: FONT_SIZES.xl, fontWeight: '700' },
-  infoPillLabel: { color: COLORS.text.muted, fontSize: FONT_SIZES.xs, marginTop: 2 },
+  infoPill: { alignItems: 'center', flex: 1 },
+  infoPillIcon:  { fontSize: 18, marginBottom: 2 },
+  infoPillValue: { color: COLORS.text.primary, fontSize: FONT_SIZES.xl, fontWeight: '800' },
+  infoPillLabel: { color: COLORS.text.muted,   fontSize: FONT_SIZES.xs, marginTop: 2 },
+  pillDivider:   { width: 1, height: 36, backgroundColor: COLORS.surface },
 
-  // Sections
-  section: {
+  // ── Section cards ─────────────────────────────────────────────────────
+
+  card: {
     marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
     backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: SPACING.md,
+    borderRadius: 14,
+    overflow: 'hidden',
   },
-  sectionLabel: {
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  cardHeaderIcon:  { fontSize: 16 },
+  cardHeaderLabel: {
     color: COLORS.gold,
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
-    marginBottom: SPACING.xs,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
-  sectionContent: { color: COLORS.text.primary, fontSize: FONT_SIZES.md, lineHeight: 20 },
-  subContent: { color: COLORS.text.secondary, fontSize: FONT_SIZES.sm, marginTop: SPACING.xs, fontStyle: 'italic' },
-  ezaLabel: {
-    color: COLORS.accent,
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '700',
+  cardBody: { padding: SPACING.md },
+
+  // ── Body text / sub-notes / EZA ───────────────────────────────────────
+
+  bodyText: {
+    color: COLORS.text.primary,
+    fontSize: FONT_SIZES.md,
+    lineHeight: 22,
+  },
+  subNote: {
+    color: COLORS.text.secondary,
+    fontSize: FONT_SIZES.sm,
+    fontStyle: 'italic',
     marginTop: SPACING.sm,
-    marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
+    lineHeight: 18,
   },
-
-  // Tags
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs },
-  tag: { backgroundColor: COLORS.surface, paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: 6 },
-  tagHighlighted: { borderWidth: 1, borderColor: COLORS.gold },
-  tagText: { color: COLORS.text.primary, fontSize: FONT_SIZES.xs },
-
-  // Transformations
-  transformCard: {
+  ezaBlock: { marginTop: SPACING.md },
+  ezaDivider: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    borderRadius: 10,
-    padding: SPACING.sm,
-    marginTop: SPACING.sm,
+    alignItems: 'center',
+    marginBottom: SPACING.md,
     gap: SPACING.sm,
   },
-  transformImage: { width: 72, height: 72, borderRadius: 8, backgroundColor: COLORS.card },
-  transformInfo: { flex: 1 },
-  transformName: { color: COLORS.text.primary, fontSize: FONT_SIZES.md, fontWeight: '700', marginBottom: 4 },
-  transformPassive: { color: COLORS.text.secondary, fontSize: FONT_SIZES.sm, lineHeight: 18 },
+  ezaLine: { flex: 1, height: 1, backgroundColor: COLORS.accent, opacity: 0.5 },
+  ezaPill: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  ezaPillText: { color: '#fff', fontSize: FONT_SIZES.xs, fontWeight: '800', letterSpacing: 0.5 },
+
+  // ── Stats table ───────────────────────────────────────────────────────
+
+  statsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+    paddingBottom: SPACING.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  statsLabelCol: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statsColHeader: {
+    flex: 1,
+    textAlign: 'center',
+    color: COLORS.text.muted,
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  rainbowHeader: { color: COLORS.gold },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+  },
+  statsIcon:  { fontSize: 14 },
+  statsLabel: {
+    color: COLORS.text.secondary,
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+    marginLeft: 4,
+    textTransform: 'uppercase',
+  },
+  statsCell: {
+    flex: 1,
+    textAlign: 'center',
+    color: COLORS.text.primary,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  rainbowCell: { color: COLORS.gold, fontWeight: '700' },
+
+  // ── Category tags ─────────────────────────────────────────────────────
+
+  tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs },
+  categoryTag: {
+    backgroundColor: 'rgba(245, 166, 35, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 166, 35, 0.35)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: 20,
+  },
+  categoryTagText: {
+    color: COLORS.gold,
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+  },
+
+  // ── Link skill tags ───────────────────────────────────────────────────
+
+  linkTag: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: 'rgba(99, 179, 237, 0.5)',   // soft blue
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: 20,
+  },
+  linkTagText: {
+    color: '#90cdf4',                          // light blue
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+  },
+
+  // ── Transformation card ───────────────────────────────────────────────
+
+  transformCard: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  transformImg: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    backgroundColor: COLORS.card,
+  },
+  transformImgPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  transformBody:     { flex: 1 },
+  transformTypeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: SPACING.xs,
+  },
+  transformName:    { color: COLORS.text.primary,   fontSize: FONT_SIZES.md, fontWeight: '700', marginBottom: 4 },
+  transformPassive: { color: COLORS.text.secondary, fontSize: FONT_SIZES.xs, lineHeight: 16 },
+  transformSA:      { color: COLORS.text.muted,     fontSize: FONT_SIZES.xs, lineHeight: 16, marginTop: 4 },
 });
