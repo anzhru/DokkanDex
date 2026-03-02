@@ -46,4 +46,5 @@ export const SPACING = {
   xxl: 32,
 } as const;
 
-export const GRAPHQL_URL = 'https://dokkanapi.azurewebsites.net/graphql';
+// Data is served from the MNprojects/DokkanAPI GitHub repo's raw JSON file.
+// See src/services/dokkanService.ts for the full URL and caching strategy.

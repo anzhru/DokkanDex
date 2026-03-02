@@ -1,171 +1,164 @@
 import { Character, CharacterSummary } from '../types';
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// ─── Data source ──────────────────────────────────────────────────────────────
+//
+// The original GraphQL API (dokkanapi.azurewebsites.net) is offline.
+// We now fetch from the source data file in the same GitHub repo, which is
+// publicly accessible via GitHub's raw CDN and never rate-limited for reads.
+//
+// The JSON is ~1.8 MB with 796 UR/LR characters.  It is fetched once per
+// app session and kept in _cache so every subsequent call is instant.
 
-const GRAPHQL_URL = 'https://dokkanapi.azurewebsites.net/graphql';
+const DATA_URL =
+  'https://raw.githubusercontent.com/MNprojects/DokkanAPI/main/data/DokkanCharacterData.json';
 
-// ─── GraphQL Fragments ────────────────────────────────────────────────────────
+// ─── In-memory cache (module-level singleton) ─────────────────────────────────
 
-/** Minimal fields needed for list / search cards */
-const SUMMARY_FIELDS = `
-  id
-  name
-  title
-  imageURL
-  rarity
-  class
-  type
-`;
+let _cache: Promise<Character[]> | null = null;
 
-/** All fields for the detail screen */
-const FULL_FIELDS = `
-  id
-  name
-  title
-  imageURL
-  rarity
-  class
-  type
-  cost
-  maxLevel
-  maxSALevel
-
-  leaderSkill
-  ezaLeaderSkill
-  superAttack
-  ezaSuperAttack
-  ultraSuperAttack
-  ezaUltraSuperAttack
-  passive
-  ezaPassive
-  activeSkill
-  activeSkillCondition
-  ezaActiveSkill
-  ezaActiveSkillCondition
-
-  baseHP
-  baseAttack
-  baseDefence
-  maxLevelHP
-  maxLevelAttack
-  maxDefence
-  freeDupeHP
-  freeDupeAttack
-  freeDupeDefence
-  rainbowHP
-  rainbowAttack
-  rainbowDefence
-
-  links
-  categories
-  kiMeter
-  kiMultiplier
-  transformationCondition
-
-  transformations {
-    transformedName
-    transformedID
-    transformedClass
-    transformedType
-    transformedSuperAttack
-    transformedUltraSuperAttack
-    transformedPassive
-    transformedImageURL
+/** Load all characters once; return the cached promise on subsequent calls. */
+function loadAll(): Promise<Character[]> {
+  if (!_cache) {
+    _cache = fetch(DATA_URL)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load character data: HTTP ${res.status}`);
+        return res.json() as Promise<Record<string, unknown>[]>;
+      })
+      .then((raw) => raw.map(mapRaw))
+      .catch((err) => {
+        _cache = null; // allow a clean retry next time
+        throw err;
+      });
   }
-`;
-
-// ─── Core fetch helper ────────────────────────────────────────────────────────
-
-interface GraphQLResponse<T> {
-  data?: T;
-  errors?: { message: string }[];
+  return _cache;
 }
 
-async function gqlFetch<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
-  const response = await fetch(GRAPHQL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  });
+// ─── Raw → typed mapper ───────────────────────────────────────────────────────
 
-  if (!response.ok) {
-    throw new Error(`Network error: ${response.status} ${response.statusText}`);
-  }
-
-  const json: GraphQLResponse<T> = await response.json();
-
-  if (json.errors?.length) {
-    throw new Error(json.errors.map((e) => e.message).join('; '));
-  }
-
-  if (json.data === undefined) {
-    throw new Error('GraphQL response contained no data');
-  }
-
-  return json.data;
+function str(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 ? v : null;
+}
+function num(v: unknown): number | null {
+  return typeof v === 'number' ? v : null;
+}
+function strArr(v: unknown): string[] | null {
+  return Array.isArray(v) ? (v as string[]) : null;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+function mapRaw(raw: Record<string, unknown>): Character {
+  return {
+    id:    str(raw.id)    ?? String(raw.id ?? ''),
+    name:  str(raw.name),
+    title: str(raw.title),
+
+    imageURL: str(raw.imageURL),
+    rarity:   str(raw.rarity)   as Character['rarity'],
+    class:    str(raw.class)    as Character['class'],
+    type:     str(raw.type)     as Character['type'],
+    cost:     num(raw.cost),
+
+    maxLevel:   num(raw.maxLevel),
+    maxSALevel: num(raw.maxSALevel),
+
+    leaderSkill:           str(raw.leaderSkill),
+    ezaLeaderSkill:        str(raw.ezaLeaderSkill),
+    superAttack:           str(raw.superAttack),
+    ezaSuperAttack:        str(raw.ezaSuperAttack),
+    ultraSuperAttack:      str(raw.ultraSuperAttack),
+    ezaUltraSuperAttack:   str(raw.ezaUltraSuperAttack),
+    passive:               str(raw.passive),
+    ezaPassive:            str(raw.ezaPassive),
+    activeSkill:           str(raw.activeSkill),
+    activeSkillCondition:  str(raw.activeSkillCondition),
+    ezaActiveSkill:        str(raw.ezaActiveSkill),
+    ezaActiveSkillCondition: str(raw.ezaActiveSkillCondition),
+
+    baseHP:          num(raw.baseHP),
+    baseAttack:      num(raw.baseAttack),
+    baseDefence:     num(raw.baseDefence),
+    maxLevelHP:      num(raw.maxLevelHP),
+    maxLevelAttack:  num(raw.maxLevelAttack),
+    maxDefence:      num(raw.maxDefence),
+    freeDupeHP:      num(raw.freeDupeHP),
+    freeDupeAttack:  num(raw.freeDupeAttack),
+    freeDupeDefence: num(raw.freeDupeDefence),
+    rainbowHP:       num(raw.rainbowHP),
+    rainbowAttack:   num(raw.rainbowAttack),
+    rainbowDefence:  num(raw.rainbowDefence),
+
+    links:      strArr(raw.links),
+    categories: strArr(raw.categories),
+    kiMeter:    strArr(raw.kiMeter),
+    kiMultiplier:         str(raw.kiMultiplier),
+    transformationCondition: str(raw.transformationCondition),
+
+    transformations: Array.isArray(raw.transformations)
+      ? (raw.transformations as Record<string, unknown>[]).map((t) => ({
+          transformedName:          str(t.transformedName),
+          transformedID:            str(t.transformedID),
+          transformedClass:         str(t.transformedClass),
+          transformedType:          str(t.transformedType),
+          transformedSuperAttack:   str(t.transformedSuperAttack),
+          transformedUltraSuperAttack: str(t.transformedUltraSuperAttack),
+          transformedPassive:       str(t.transformedPassive),
+          transformedImageURL:      str(t.transformedImageURL),
+        }))
+      : null,
+  };
+}
+
+function toSummary(c: Character): CharacterSummary {
+  return {
+    id:       c.id,
+    name:     c.name,
+    title:    c.title,
+    imageURL: c.imageURL,
+    rarity:   c.rarity,
+    class:    c.class,
+    type:     c.type,
+  };
+}
+
+// ─── Public API (same signatures as before — no changes needed in hooks/screens) ─
 
 /**
- * Fetch all characters with summary fields (name, title, id, image, type, etc.).
- * NOTE: The API only covers UR and LR rarity characters.
+ * Fetch all 796 UR/LR characters.  Cached after the first call.
  */
 export async function fetchAllCharacters(): Promise<CharacterSummary[]> {
-  const query = `
-    query FetchAllCharacters {
-      characters {
-        ${SUMMARY_FIELDS}
-      }
-    }
-  `;
-
-  const data = await gqlFetch<{ characters: CharacterSummary[] }>(query);
-  return data.characters ?? [];
+  const all = await loadAll();
+  return all.map(toSummary);
 }
 
 /**
- * Fetch a single character by ID with full stats, skills, categories, links,
- * leader skill, and transformation data.
+ * Return the full character record for a given ID.
+ * Uses the in-memory cache — no extra network request after the first load.
  */
 export async function fetchCharacterById(id: string): Promise<Character> {
-  const query = `
-    query FetchCharacterById($id: String!) {
-      character(id: $id) {
-        ${FULL_FIELDS}
-      }
-    }
-  `;
-
-  const data = await gqlFetch<{ character: Character | null }>(query, { id });
-
-  if (!data.character) {
-    throw new Error(`Character with id "${id}" not found`);
-  }
-
-  return data.character;
+  const all = await loadAll();
+  const found = all.find((c) => c.id === id);
+  if (!found) throw new Error(`Character "${id}" not found`);
+  return found;
 }
 
 /**
- * Search characters by name (case-insensitive substring match).
- * Returns summary fields suitable for a results list.
+ * Case-insensitive substring search across name AND title.
+ * Instant after the initial load because filtering is done in-memory.
  */
-export async function searchCharactersByName(name: string): Promise<CharacterSummary[]> {
-  const query = `
-    query SearchCharacters($name: String!) {
-      characters(name: $name) {
-        ${SUMMARY_FIELDS}
-      }
-    }
-  `;
-
-  const data = await gqlFetch<{ characters: CharacterSummary[] }>(query, { name });
-  return data.characters ?? [];
+export async function searchCharactersByName(query: string): Promise<CharacterSummary[]> {
+  const all  = await loadAll();
+  const q    = query.trim().toLowerCase();
+  if (!q) return all.map(toSummary);
+  return all
+    .filter(
+      (c) =>
+        c.name?.toLowerCase().includes(q) ||
+        c.title?.toLowerCase().includes(q),
+    )
+    .map(toSummary);
 }
 
 /**
- * Filter characters by type, rarity, class, or categories.
- * All provided filters are combined with AND logic.
+ * Filter characters by type, rarity, class, and/or categories (AND logic).
  */
 export async function filterCharacters(filters: {
   type?: string;
@@ -173,24 +166,17 @@ export async function filterCharacters(filters: {
   class?: string;
   categories?: string[];
 }): Promise<CharacterSummary[]> {
-  const query = `
-    query FilterCharacters(
-      $type: String
-      $rarity: String
-      $class: String
-      $categories: [String]
-    ) {
-      characters(
-        type: $type
-        rarity: $rarity
-        class: $class
-        categories: $categories
-      ) {
-        ${SUMMARY_FIELDS}
+  const all = await loadAll();
+  return all
+    .filter((c) => {
+      if (filters.type   && c.type   !== filters.type)   return false;
+      if (filters.rarity && c.rarity !== filters.rarity) return false;
+      if (filters.class  && c.class  !== filters.class)  return false;
+      if (filters.categories?.length) {
+        const cCats = c.categories ?? [];
+        if (!filters.categories.every((fc) => cCats.includes(fc))) return false;
       }
-    }
-  `;
-
-  const data = await gqlFetch<{ characters: CharacterSummary[] }>(query, filters);
-  return data.characters ?? [];
+      return true;
+    })
+    .map(toSummary);
 }
