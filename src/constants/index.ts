@@ -46,5 +46,5 @@ export const SPACING = {
   xxl: 32,
 } as const;
 
-// Data is served from the MNprojects/DokkanAPI GitHub repo's raw JSON file.
-// See src/services/dokkanService.ts for the full URL and caching strategy.
+// Data is served live from the DokkanDB (dokkandb.com) Supabase database.
+// See src/services/dokkanService.ts for implementation details.

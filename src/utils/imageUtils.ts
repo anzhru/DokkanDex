@@ -1,21 +1,24 @@
 /**
- * Resolves a character's thumbnail image URL.
+ * Resolves character image URLs using the Supabase CDN that backs dokkandb.com.
+ * These are official Bandai game assets hosted on Supabase Storage.
  *
- * Priority:
- *  1. imageURL returned directly by the DokkanAPI (scraped from Fandom wiki)
- *  2. Fandom wiki Special:FilePath fallback, constructed from the character ID.
- *     The Dokkan wiki names card thumbs "Card_{id}_thumb.png", so
- *     Special:FilePath redirects to the real CDN URL automatically.
+ * Primary:  Supabase Storage (DokkanDB's CDN) — fast, always up-to-date
+ * Fallback: Fandom wiki Special:FilePath — works for older cards not yet on Supabase
  */
+
+const SB_STORAGE =
+  'https://enaskhebnjtktdfszdcb.supabase.co/storage/v1/object/public/assets';
+
+/** Thumbnail image (used in grid cards) */
 export function getCharacterImageUrl(id: string, imageURL: string | null | undefined): string {
-  if (imageURL) return imageURL;
-  return `https://dbz-dokkanbattle.fandom.com/wiki/Special:FilePath/Card_${id}_thumb.png`;
+  if (imageURL && imageURL.startsWith('http')) return imageURL;
+  // Supabase CDN first
+  return `${SB_STORAGE}/character/thumb/card_${id}_thumb_folder/card_${id}_thumb.png`;
 }
 
-/**
- * Resolves the full card art URL (higher res than thumb).
- */
+/** Full card art (used on detail screen hero) */
 export function getCharacterArtUrl(id: string, imageURL: string | null | undefined): string {
-  if (imageURL) return imageURL;
-  return `https://dbz-dokkanbattle.fandom.com/wiki/Special:FilePath/Card_${id}.png`;
+  if (imageURL && imageURL.startsWith('http')) return imageURL;
+  // Supabase CDN first
+  return `${SB_STORAGE}/character/thumb/card_${id}_thumb_folder/card_${id}_thumb.png`;
 }
