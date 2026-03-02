@@ -1,17 +1,25 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ScrollView, View, Text, Image, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Transformation } from '../types';
 import { useCharacter } from '../hooks/useCharacter';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorView } from '../components/ErrorView';
+import { getCharacterImageUrl } from '../utils/imageUtils';
 import { COLORS, FONT_SIZES, SPACING } from '../constants';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CharacterDetail'>;
 
-export function CharacterDetailScreen({ route }: Props) {
+export function CharacterDetailScreen({ route, navigation }: Props) {
   const { characterId } = route.params;
   const { character, loading, error, refetch } = useCharacter(characterId);
+
+  // Set header title once character is loaded
+  useEffect(() => {
+    if (character?.name) {
+      navigation.setOptions({ title: character.name });
+    }
+  }, [character?.name, navigation]);
 
   if (loading) return <LoadingSpinner message="Loading character..." />;
   if (error || !character) return <ErrorView message={error ?? 'Character not found'} onRetry={refetch} />;
@@ -23,7 +31,7 @@ export function CharacterDetailScreen({ route }: Props) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Hero image */}
       <Image
-        source={character.imageURL ? { uri: character.imageURL } : undefined}
+        source={{ uri: getCharacterImageUrl(character.id, character.imageURL) }}
         style={styles.art}
         resizeMode="contain"
       />
