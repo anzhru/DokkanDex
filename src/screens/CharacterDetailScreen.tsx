@@ -5,6 +5,7 @@ import {
   Text,
   Image,
   StyleSheet,
+  TouchableOpacity,
   useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +16,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorView } from '../components/ErrorView';
 import { getCharacterImageUrl } from '../utils/imageUtils';
 import { COLORS, FONT_SIZES, SPACING } from '../constants';
+import { useFavorites } from '../context/FavoritesContext';
 
 // ─── Local theme maps ─────────────────────────────────────────────────────────
 
@@ -58,14 +60,25 @@ export function CharacterDetailScreen({ route, navigation }: Props) {
   const { characterId } = route.params;
   const { character, loading, error, refetch } = useCharacter(characterId);
   const { width } = useWindowDimensions();
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   const heroHeight = Math.round(width * 0.9);
+  const fav = isFavorite(characterId);
 
   useEffect(() => {
-    if (character?.name) {
-      navigation.setOptions({ title: character.name });
-    }
-  }, [character?.name, navigation]);
+    navigation.setOptions({
+      title: character?.name ?? '',
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => toggleFavorite(characterId)}
+          style={{ marginRight: 4, padding: 6 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={{ fontSize: 26 }}>{fav ? '⭐' : '☆'}</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [character?.name, navigation, fav, characterId, toggleFavorite]);
 
   if (loading) return <LoadingSpinner message="Loading character…" />;
   if (error || !character) {

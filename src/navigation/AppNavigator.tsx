@@ -9,6 +9,7 @@ import { CharacterDetailScreen } from '../screens/CharacterDetailScreen';
 import { SearchScreen } from '../screens/SearchScreen';
 import { FavoritesScreen } from '../screens/FavoritesScreen';
 import { COLORS, FONT_SIZES, SPACING } from '../constants';
+import { useFavorites } from '../context/FavoritesContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab   = createBottomTabNavigator<BottomTabParamList>();
@@ -63,6 +64,9 @@ const headerStyles = StyleSheet.create({
 // ─── Bottom Tabs ──────────────────────────────────────────────────────────────
 
 function MainTabs() {
+  const { favoriteIds } = useFavorites();
+  const favCount = favoriteIds.size;
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -97,8 +101,12 @@ function MainTabs() {
         component={EncyclopediaScreen}
         options={{ headerTitle: () => <DokkanDexTitle /> }}
       />
-      <Tab.Screen name="Search"    component={SearchScreen} />
-      <Tab.Screen name="Favorites" component={FavoritesScreen} />
+      <Tab.Screen name="Search" component={SearchScreen} />
+      <Tab.Screen
+        name="Favorites"
+        component={FavoritesScreen}
+        options={{ tabBarBadge: favCount > 0 ? favCount : undefined }}
+      />
     </Tab.Navigator>
   );
 }
