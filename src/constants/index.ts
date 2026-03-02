@@ -46,4 +46,4 @@ export const SPACING = {
   xxl: 32,
 } as const;
 
-export const API_BASE_URL = 'https://dokkan.wiki/api';
+export const GRAPHQL_URL = 'https://dokkanapi.azurewebsites.net/graphql';

@@ -2,7 +2,7 @@ import React from 'react';
 import { FlatList, StyleSheet, View, Text } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
-import { Character, RootStackParamList } from '../types';
+import { CharacterSummary, RootStackParamList } from '../types';
 import { CharacterCard } from '../components/CharacterCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorView } from '../components/ErrorView';
@@ -18,15 +18,15 @@ export function EncyclopediaScreen() {
   if (loading) return <LoadingSpinner message="Loading characters..." />;
   if (error) return <ErrorView message={error} onRetry={refetch} />;
 
-  function handlePress(character: Character) {
-    navigation.navigate('CharacterDetail', { character });
+  function handlePress(character: CharacterSummary) {
+    navigation.navigate('CharacterDetail', { characterId: character.id });
   }
 
   return (
     <View style={styles.container}>
       <FlatList
         data={characters}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <CharacterCard character={item} onPress={handlePress} />
         )}

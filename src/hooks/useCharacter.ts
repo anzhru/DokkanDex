@@ -1,29 +1,30 @@
 import { useState, useEffect } from 'react';
-import { CharacterSummary } from '../types';
-import { fetchAllCharacters } from '../services/dokkanService';
+import { Character } from '../types';
+import { fetchCharacterById } from '../services/dokkanService';
 
-interface UseCharactersResult {
-  characters: CharacterSummary[];
+interface UseCharacterResult {
+  character: Character | null;
   loading: boolean;
   error: string | null;
   refetch: () => void;
 }
 
-export function useCharacters(): UseCharactersResult {
-  const [characters, setCharacters] = useState<CharacterSummary[]>([]);
+export function useCharacter(id: string): UseCharacterResult {
+  const [character, setCharacter] = useState<Character | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    if (!id) return;
     let cancelled = false;
 
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchAllCharacters();
-        if (!cancelled) setCharacters(data);
+        const data = await fetchCharacterById(id);
+        if (!cancelled) setCharacter(data);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -33,7 +34,7 @@ export function useCharacters(): UseCharactersResult {
 
     load();
     return () => { cancelled = true; };
-  }, [refreshKey]);
+  }, [id, refreshKey]);
 
-  return { characters, loading, error, refetch: () => setRefreshKey(k => k + 1) };
+  return { character, loading, error, refetch: () => setRefreshKey(k => k + 1) };
 }

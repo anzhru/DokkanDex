@@ -2,10 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { View, TextInput, FlatList, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Character, RootStackParamList } from '../types';
+import { CharacterSummary, RootStackParamList } from '../types';
 import { CharacterCard } from '../components/CharacterCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { searchCharacters } from '../services/dokkanService';
+import { searchCharactersByName } from '../services/dokkanService';
 import { COLORS, FONT_SIZES, SPACING } from '../constants';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'Main'>;
@@ -13,7 +13,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'Main'>;
 export function SearchScreen() {
   const navigation = useNavigation<Nav>();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Character[]>([]);
+  const [results, setResults] = useState<CharacterSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
@@ -26,15 +26,20 @@ export function SearchScreen() {
     }
     setLoading(true);
     try {
-      const data = await searchCharacters(text.trim());
+      const data = await searchCharactersByName(text.trim());
       setResults(data);
       setSearched(true);
     } catch {
       setResults([]);
+      setSearched(true);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  function handlePress(character: CharacterSummary) {
+    navigation.navigate('CharacterDetail', { characterId: character.id });
+  }
 
   return (
     <View style={styles.container}>
@@ -55,12 +60,9 @@ export function SearchScreen() {
       ) : (
         <FlatList
           data={results}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <CharacterCard
-              character={item}
-              onPress={(c) => navigation.navigate('CharacterDetail', { character: c })}
-            />
+            <CharacterCard character={item} onPress={handlePress} />
           )}
           contentContainerStyle={styles.list}
           ListEmptyComponent={
