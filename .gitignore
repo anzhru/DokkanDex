@@ -37,5 +37,12 @@ yarn-error.*
 *.tsbuildinfo
 
 # generated native folders
-/ios
+# ios/ is committed so Xcode can build directly from the repo
 /android
+
+# Xcode build artefacts (never commit these)
+ios/build/
+ios/Pods/
+ios/DerivedData/
+ios/**/*.xcuserstate
+ios/*.xcarchive

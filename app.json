@@ -1,31 +1,44 @@
 {
   "expo": {
     "name": "DokkanDex",
-    "slug": "DokkanDex",
+    "slug": "dokkandex",
     "version": "1.0.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1a1a2e"
     },
+
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.dokkandex.app"
+      "bundleIdentifier": "com.dokkandex.app",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "deploymentTarget": "16.0",
+      "infoPlist": {
+        "UIRequiresFullScreen": false,
+        "NSCameraUsageDescription": "DokkanDex does not use the camera.",
+        "NSPhotoLibraryUsageDescription": "DokkanDex does not access your photos."
+      }
     },
+
     "android": {
+      "package": "com.dokkandex.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
+        "backgroundColor": "#1a1a2e"
+      }
     },
+
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+
+    "plugins": []
   }
 }
